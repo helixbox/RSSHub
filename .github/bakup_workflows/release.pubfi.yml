@@ -94,11 +94,3 @@ jobs:
         env:
           COSIGN_EXPERIMENTAL: 'true'
         run: echo "${{ steps.meta-chromium-bundled.outputs.tags }}" | xargs -I {} cosign sign --yes {}@${{ steps.build-and-push-chromium.outputs.digest }}
-
-      - name: Deploy
-        uses: tarasyarema/dokploy-deploy-action@main
-        with:
-          auth_token: ${{ secrets.DOKPLOY_TOKEN }}
-          application_id: xRDUMgJGh52qvtaJakCAq
-          dokploy_url: ${{ secrets.DOKPLOY_URL }}
-          wait_for_completion: true
