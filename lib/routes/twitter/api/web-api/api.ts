@@ -163,7 +163,7 @@ const getList = async (id: string, params?: Record<string, any>) =>
             {
                 ...params,
                 listId: id,
-                count: 40,
+                count: 20,
             },
             ['list', 'tweets_timeline', 'timeline']
         )
