@@ -361,6 +361,7 @@ export type Config = {
         authenticationSecret?: string[];
         phoneOrEmail?: string[];
         authToken?: string[];
+        proxyUris?: string[];
         thirdPartyApi?: string;
     };
     uestc: {
@@ -823,6 +824,9 @@ const calculateValue = () => {
             authenticationSecret: envs.TWITTER_AUTHENTICATION_SECRET?.split(','),
             phoneOrEmail: envs.TWITTER_PHONE_OR_EMAIL?.split(','),
             authToken: envs.TWITTER_AUTH_TOKEN?.split(','),
+            proxyUris: envs.TWITTER_PROXY_URIS?.split(',')
+                .map((uri) => uri.trim())
+                .filter(Boolean),
             thirdPartyApi: envs.TWITTER_THIRD_PARTY_API,
         },
         uestc: {

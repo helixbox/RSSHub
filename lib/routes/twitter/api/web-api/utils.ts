@@ -13,7 +13,7 @@ import login from './login';
 
 let authTokenIndex = 0;
 
-const token2Cookie = async (token) => {
+const token2Cookie = async (token, proxyUri?) => {
     const c = await cache.get(`twitter:cookie:${token}`);
     if (c) {
         return c;
@@ -21,10 +21,11 @@ const token2Cookie = async (token) => {
     const jar = new CookieJar();
     await jar.setCookie(`auth_token=${token}`, 'https://x.com');
     try {
-        const agent = proxy.proxyUri
+        const effectiveProxyUri = proxyUri || proxy.proxyUri;
+        const agent = effectiveProxyUri
             ? new ProxyAgent({
                   factory: (origin, opts) => new CookieClient(origin as string, { ...opts, cookies: { jar } }),
-                  uri: proxy.proxyUri,
+                  uri: effectiveProxyUri,
               })
             : new CookieAgent({ cookies: { jar } });
         if (token) {
@@ -66,6 +67,7 @@ const getAuth = async (retry: number) => {
             await cache.set(`${lockPrefix}${token}`, '1', 20);
             return {
                 token,
+                proxyUri: config.twitter.proxyUris?.[index],
                 username: config.twitter.username?.[index],
                 password: config.twitter.password?.[index],
                 authenticationSecret: config.twitter.authenticationSecret?.[index],
@@ -89,7 +91,7 @@ export const twitterGot = async (
 
     const requestUrl = `${url}?${queryString.stringify(params)}`;
 
-    let cookie: string | Record<string, any> | null | undefined = await token2Cookie(auth?.token);
+    let cookie: string | Record<string, any> | null | undefined = await token2Cookie(auth?.token, auth?.proxyUri);
     if (!cookie && auth) {
         cookie = await login({
             username: auth.username,
@@ -109,14 +111,15 @@ export const twitterGot = async (
             cookie = JSON.parse(cookie);
         }
         const jar = CookieJar.deserializeSync(cookie as any);
-        const agent = proxy.proxyUri
+        const effectiveProxyUri = auth?.proxyUri || proxy.proxyUri;
+        const agent = effectiveProxyUri
             ? new ProxyAgent({
                   factory: (origin, opts) => new CookieClient(origin as string, { ...opts, cookies: { jar } }),
-                  uri: proxy.proxyUri,
+                  uri: effectiveProxyUri,
               })
             : new CookieAgent({ cookies: { jar } });
-        if (proxy.proxyUri) {
-            logger.debug(`twitter debug: Proxying request: ${requestUrl}`);
+        if (effectiveProxyUri) {
+            logger.info(`twitter info: Proxying request: ${requestUrl} via ${effectiveProxyUri}`);
         }
         dispatchers = {
             jar,
