@@ -22,6 +22,9 @@ const token2Cookie = async (token, proxyUri?) => {
     await jar.setCookie(`auth_token=${token}`, 'https://x.com');
     try {
         const effectiveProxyUri = proxyUri || proxy.proxyUri;
+        if (effectiveProxyUri) {
+            logger.info(`twitter token2Cookie via proxy: ${effectiveProxyUri}`);
+        }
         const agent = effectiveProxyUri
             ? new ProxyAgent({
                   factory: (origin, opts) => new CookieClient(origin as string, { ...opts, cookies: { jar } }),
@@ -90,6 +93,11 @@ export const twitterGot = async (
     }
 
     const requestUrl = `${url}?${queryString.stringify(params)}`;
+
+    const effectiveProxyUri = auth?.proxyUri || proxy.proxyUri;
+    if (effectiveProxyUri) {
+        logger.info(`twitter request via proxy: ${effectiveProxyUri}`);
+    }
 
     let cookie: string | Record<string, any> | null | undefined = await token2Cookie(auth?.token, auth?.proxyUri);
     if (!cookie && auth) {
