@@ -9,7 +9,7 @@ const graphQLEndpointsPlain = [
     '/graphql/dexO_2tohK86JDudXXG3Yw/UserMedia',
     '/graphql/Qw77dDjp9xCpUY-AXwt-yQ/UserByRestId',
     '/graphql/UN1i3zUiCWa-6r-Uaho4fw/SearchTimeline',
-    '/graphql/l411pL-GRg-AKo_a2rmYjg/ListLatestTweetsTimeline',
+    '/graphql/06JtmwM8k_1cthpFZITVVA/ListLatestTweetsTimeline',
     '/graphql/QuBlQ6SxNAQCt6-kBiCXCQ/TweetDetail',
 ];
 
