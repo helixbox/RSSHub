@@ -1,0 +1,104 @@
+name: 'Docker Release (Pubfi)'
+
+on:
+  push:
+    branches:
+      - pubfi
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      packages: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install cosign
+        if: github.event_name != 'pull_request'
+        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3.9.1
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata (ordinary version)
+        id: meta-ordinary
+        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5.7.0
+        with:
+          images: |
+            ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=latest,enable=true
+            type=raw,value={{date 'YYYY-MM-DD'}},enable=true
+            type=sha,format=long,prefix=,enable=true
+          flavor: latest=false
+
+      - name: Build and push Docker image (ordinary version)
+        id: build-and-push
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta-ordinary.outputs.tags }}
+          labels: ${{ steps.meta-ordinary.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha,scope=docker-release
+          cache-to: type=gha,mode=max,scope=docker-release
+
+      - name: Sign the published Docker image
+        if: ${{ github.event_name != 'pull_request' }}
+        env:
+          COSIGN_EXPERIMENTAL: 'true'
+        run: echo "${{ steps.meta-ordinary.outputs.tags }}" | xargs -I {} cosign sign --yes {}@${{ steps.build-and-push.outputs.digest }}
+
+      - name: Extract Docker metadata (Chromium-bundled version)
+        id: meta-chromium-bundled
+        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5.7.0
+        with:
+          images: |
+            ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=chromium-bundled,enable=true
+            type=raw,value=chromium-bundled-{{date 'YYYY-MM-DD'}},enable=true
+            type=sha,format=long,prefix=chromium-bundled-,enable=true
+          flavor: latest=false
+
+      - name: Build and push Docker image (Chromium-bundled version)
+        id: build-and-push-chromium
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: .
+          build-args: PUPPETEER_SKIP_DOWNLOAD=0
+          push: true
+          tags: ${{ steps.meta-chromium-bundled.outputs.tags }}
+          labels: ${{ steps.meta-chromium-bundled.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+          cache-from: |
+            type=registry,ref=${{ secrets.DOCKER_USERNAME }}/rsshub:chromium-bundled
+          cache-to: type=inline,ref=${{ secrets.DOCKER_USERNAME }}/rsshub:chromium-bundled  # inline cache is enough
+
+      - name: Sign the published Docker image
+        if: ${{ github.event_name != 'pull_request' }}
+        env:
+          COSIGN_EXPERIMENTAL: 'true'
+        run: echo "${{ steps.meta-chromium-bundled.outputs.tags }}" | xargs -I {} cosign sign --yes {}@${{ steps.build-and-push-chromium.outputs.digest }}
+
+      - name: Deploy
+        uses: tarasyarema/dokploy-deploy-action@main
+        with:
+          auth_token: ${{ secrets.DOKPLOY_TOKEN }}
+          application_id: xRDUMgJGh52qvtaJakCAq
+          dokploy_url: ${{ secrets.DOKPLOY_URL }}
+          wait_for_completion: true

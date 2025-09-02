@@ -13,7 +13,7 @@ import login from './login';
 
 let authTokenIndex = 0;
 
-const token2Cookie = async (token) => {
+const token2Cookie = async (token, proxyUri?) => {
     const c = await cache.get(`twitter:cookie:${token}`);
     if (c) {
         return c;
@@ -21,10 +21,14 @@ const token2Cookie = async (token) => {
     const jar = new CookieJar();
     await jar.setCookie(`auth_token=${token}`, 'https://x.com');
     try {
-        const agent = proxy.proxyUri
+        const effectiveProxyUri = proxyUri || proxy.proxyUri;
+        if (effectiveProxyUri) {
+            logger.info(`twitter token2Cookie via proxy: ${effectiveProxyUri}`);
+        }
+        const agent = effectiveProxyUri
             ? new ProxyAgent({
                   factory: (origin, opts) => new CookieClient(origin as string, { ...opts, cookies: { jar } }),
-                  uri: proxy.proxyUri,
+                  uri: effectiveProxyUri,
               })
             : new CookieAgent({ cookies: { jar } });
         if (token) {
@@ -58,13 +62,15 @@ const getAuth = async (retry: number) => {
         const lock = await cache.get(`${lockPrefix}${token}`, false);
         if (lock) {
             logger.debug(`twitter debug: twitter cookie for token ${token} is locked, retry: ${retry}`);
-            await new Promise((resolve) => setTimeout(resolve, Math.random() * 500 + 500));
-            return await getAuth(retry - 1);
+            // await new Promise((resolve) => setTimeout(resolve, Math.random() * 500 + 500));
+            // return await getAuth(retry - 1);
+            return;
         } else {
             logger.debug(`twitter debug: lock twitter cookie for token ${token}`);
             await cache.set(`${lockPrefix}${token}`, '1', 20);
             return {
                 token,
+                proxyUri: config.twitter.proxyUris?.[index],
                 username: config.twitter.username?.[index],
                 password: config.twitter.password?.[index],
                 authenticationSecret: config.twitter.authenticationSecret?.[index],
@@ -88,7 +94,12 @@ export const twitterGot = async (
 
     const requestUrl = `${url}?${queryString.stringify(params)}`;
 
-    let cookie: string | Record<string, any> | null | undefined = await token2Cookie(auth?.token);
+    const effectiveProxyUri = auth?.proxyUri || proxy.proxyUri;
+    if (effectiveProxyUri) {
+        logger.info(`twitter request via proxy: ${effectiveProxyUri}`);
+    }
+
+    let cookie: string | Record<string, any> | null | undefined = await token2Cookie(auth?.token, auth?.proxyUri);
     if (!cookie && auth) {
         cookie = await login({
             username: auth.username,
@@ -108,14 +119,15 @@ export const twitterGot = async (
             cookie = JSON.parse(cookie);
         }
         const jar = CookieJar.deserializeSync(cookie as any);
-        const agent = proxy.proxyUri
+        const effectiveProxyUri = auth?.proxyUri || proxy.proxyUri;
+        const agent = effectiveProxyUri
             ? new ProxyAgent({
                   factory: (origin, opts) => new CookieClient(origin as string, { ...opts, cookies: { jar } }),
-                  uri: proxy.proxyUri,
+                  uri: effectiveProxyUri,
               })
             : new CookieAgent({ cookies: { jar } });
-        if (proxy.proxyUri) {
-            logger.debug(`twitter debug: Proxying request: ${requestUrl}`);
+        if (effectiveProxyUri) {
+            logger.info(`twitter info: Proxying request: ${requestUrl} via ${effectiveProxyUri}`);
         }
         dispatchers = {
             jar,

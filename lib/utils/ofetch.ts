@@ -7,7 +7,7 @@ config.enableRemoteDebugging && process.env.NODE_ENV === 'dev' && register();
 
 const rofetch = createFetch().create({
     retryStatusCodes: [400, 408, 409, 425, 429, 500, 502, 503, 504],
-    retry: config.requestRetry,
+    retry: 0,
     retryDelay: 1000,
     // timeout: config.requestTimeout,
     onResponseError({ request, response, options }) {
